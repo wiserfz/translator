@@ -121,6 +121,10 @@ Avoid relying on real Google Translate calls in automated tests because the serv
 - Keep comments and documentation in English.
 - Do not add dependencies unless they clearly improve maintainability, UX, correctness, or testability.
 
+## License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
 ## Notes
 
 Runtime translation depends on network access and Google Translate's web endpoint. Failures from the network or response parsing are surfaced through the CLI error path.
