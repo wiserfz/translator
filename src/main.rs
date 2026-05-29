@@ -1,7 +1,6 @@
 use std::error::Error;
 
-use translator::parse_cli;
-use translators::{GoogleTranslator, Translator};
+use translator::{GoogleTranslator, parse_cli};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
