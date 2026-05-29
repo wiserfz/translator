@@ -1,6 +1,13 @@
+mod cli;
+mod client;
+mod error;
+mod language;
+mod response;
+
 use std::error::Error;
 
-use translator::{GoogleTranslator, parse_cli};
+use cli::parse_cli;
+use client::GoogleTranslator;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
