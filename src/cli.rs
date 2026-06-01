@@ -9,7 +9,7 @@ use crate::language::{DEFAULT_SOURCE_LANGUAGE, DEFAULT_TARGET_LANGUAGE, normaliz
     version,
     about = "Translate terminal text with Google Translate",
     long_about = "Translate one or more text fragments from a source language to a target language.\n\nBy default, tror translates English text to Simplified Chinese. Pass multiple text fragments to preserve line breaks in the translated input.",
-    after_help = "Examples:\n  tror \"Hello, world\" \"this is Rust code language.\"\n  tror -i cn -o en \"你好，世界；这是 Rust 编程语言\"\n  tror -i auto -o ja \"Good morning\"",
+    after_help = "Examples:\n  tror \"Hello, world\" \"this is Rust code language.\"\n  tror -i cn -o en \"你好，世界；这是 Rust 编程语言\"\n  tror -i auto -o ja \"Good morning\"\n  tror -p http://127.0.0.1:7890 \"Hello, world\"",
     styles = clap_cargo::style::CLAP_STYLING
 )]
 pub struct Cli {
@@ -33,6 +33,15 @@ pub struct Cli {
     )]
     pub output_language: String,
 
+    /// HTTP proxy URL to use for Google Translate requests.
+    #[arg(
+        short = 'p',
+        long = "proxy",
+        value_name = "URL",
+        help = "HTTP proxy URL used for requests, for example: http://127.0.0.1:7890"
+    )]
+    pub proxy: Option<String>,
+
     /// Text fragments to translate. Multiple fragments are joined with newlines.
     #[arg(
         required = true,
@@ -54,6 +63,13 @@ impl Cli {
     pub fn target_language(&self) -> String {
         normalize_language_code(&self.output_language)
     }
+
+    pub fn proxy_url(&self) -> Option<&str> {
+        self.proxy
+            .as_deref()
+            .map(str::trim)
+            .filter(|proxy| !proxy.is_empty())
+    }
 }
 
 pub fn parse_cli() -> Cli {
@@ -73,6 +89,7 @@ mod tests {
 
         assert_eq!(cli.input_language, DEFAULT_SOURCE_LANGUAGE);
         assert_eq!(cli.output_language, DEFAULT_TARGET_LANGUAGE);
+        assert_eq!(cli.proxy_url(), None);
         assert_eq!(cli.input_text(), "Hello, world");
     }
 
@@ -94,6 +111,20 @@ mod tests {
     }
 
     #[test]
+    fn parses_proxy_url() {
+        let cli = Cli::parse_from(["tror", "-p", "http://127.0.0.1:7890", "Hello, world"]);
+
+        assert_eq!(cli.proxy_url(), Some("http://127.0.0.1:7890"));
+    }
+
+    #[test]
+    fn trims_blank_proxy_url_to_none() {
+        let cli = Cli::parse_from(["tror", "-p", " ", "Hello, world"]);
+
+        assert_eq!(cli.proxy_url(), None);
+    }
+
+    #[test]
     fn help_includes_examples_and_language_guidance() {
         let mut command = Cli::command();
         let help = command.render_long_help().to_string();
@@ -103,6 +134,7 @@ mod tests {
         assert!(help.contains("tror -i cn -o en"));
         assert!(help.contains("Source language code"));
         assert!(help.contains("Target language code"));
+        assert!(help.contains("HTTP proxy URL"));
     }
 
     #[test]

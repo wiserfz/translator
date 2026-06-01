@@ -1,4 +1,7 @@
-use reqwest::header::{ACCEPT, USER_AGENT};
+use reqwest::{
+    Proxy,
+    header::{ACCEPT, USER_AGENT},
+};
 
 use crate::{error::TranslateError, response::parse_google_translate_response};
 
@@ -17,10 +20,20 @@ pub struct GoogleTranslator {
 }
 
 impl GoogleTranslator {
-    pub fn new() -> Self {
-        Self {
-            client: reqwest::Client::new(),
-        }
+    pub fn new() -> Result<Self, TranslateError> {
+        Self::with_proxy(None)
+    }
+
+    pub fn with_proxy(proxy_url: Option<&str>) -> Result<Self, TranslateError> {
+        let builder = reqwest::Client::builder();
+        let builder = match proxy_url {
+            Some(proxy_url) => builder.proxy(Proxy::all(proxy_url)?),
+            None => builder.no_proxy(),
+        };
+
+        Ok(Self {
+            client: builder.build()?,
+        })
     }
 
     pub async fn translate_async(
@@ -49,12 +62,6 @@ impl GoogleTranslator {
     }
 }
 
-impl Default for GoogleTranslator {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 pub fn google_translate_request_params<'a>(
     text: &'a str,
     source_language: &'a str,
@@ -77,7 +84,22 @@ pub fn google_translate_request_params<'a>(
 
 #[cfg(test)]
 mod tests {
-    use super::{GOOGLE_TRANSLATE_ENDPOINT, google_translate_request_params};
+    use super::{GOOGLE_TRANSLATE_ENDPOINT, GoogleTranslator, google_translate_request_params};
+
+    #[test]
+    fn translator_can_be_built_without_proxy() {
+        assert!(GoogleTranslator::new().is_ok());
+    }
+
+    #[test]
+    fn translator_can_be_built_with_http_proxy() {
+        assert!(GoogleTranslator::with_proxy(Some("http://127.0.0.1:7890")).is_ok());
+    }
+
+    #[test]
+    fn translator_rejects_invalid_proxy_url() {
+        assert!(GoogleTranslator::with_proxy(Some("not a proxy url")).is_err());
+    }
 
     #[test]
     fn request_params_use_google_translate_endpoint_conventions() {

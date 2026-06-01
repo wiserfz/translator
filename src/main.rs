@@ -12,7 +12,10 @@ use client::GoogleTranslator;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
     let cli = parse_cli();
-    let translator = GoogleTranslator::default();
+    let translator = match cli.proxy_url() {
+        Some(proxy_url) => GoogleTranslator::with_proxy(Some(proxy_url))?,
+        None => GoogleTranslator::new()?,
+    };
     let translated_text = translator
         .translate_async(
             &cli.input_text(),

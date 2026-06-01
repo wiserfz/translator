@@ -9,6 +9,7 @@ By default, `tror` translates English text to Simplified Chinese. Source and tar
 - Translate one or more text fragments from the terminal.
 - Preserve multiple positional text arguments as newline-separated input.
 - Configure source and target languages with short or long flags.
+- Send requests through an explicit HTTP proxy with `-p` or `--proxy`.
 - Use `auto` to ask Google Translate to detect the source language.
 - Normalize common aliases such as `cn` and `zh` to `zh-CN`.
 - Use an internal async Google Translate web client built on `reqwest` and `tokio`.
@@ -45,6 +46,9 @@ tror -i cn -o en "你好，世界；这是 Rust 编程语言"
 
 # Ask Google Translate to detect the source language
 tror -i auto -o ja "Good morning"
+
+# Send the translation request through an HTTP proxy
+tror -p http://127.0.0.1:7890 "Hello, world"
 ```
 
 Show the generated help text:
@@ -63,6 +67,7 @@ cargo run -- -i cn -o en "你好，世界；这是 Rust 编程语言"
 
 - `-i, --input <LANG>`: Source language code. Defaults to `en`.
 - `-o, --output <LANG>`: Target language code. Defaults to `zh-CN`.
+- `-p, --proxy <URL>`: HTTP proxy URL used for requests. If omitted, no proxy is used.
 - `<TEXT>...`: Required text fragments to translate.
 
 Language normalization currently includes:
@@ -111,6 +116,8 @@ cargo test
 Prefer tests that do not require live network access. Request construction, language normalization, CLI parsing, and response parsing should be covered with unit tests or local fixtures.
 
 Avoid relying on real Google Translate calls in automated tests because the service is external and its undocumented response shape can change.
+
+Proxy configuration should be tested through CLI parsing and client construction tests rather than live proxy/network calls.
 
 ## Coding Standards
 
