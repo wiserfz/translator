@@ -1,4 +1,7 @@
+use std::io::{self, Read};
+
 use clap::Parser;
+use clap_complete::Shell;
 
 use crate::language::{DEFAULT_SOURCE_LANGUAGE, DEFAULT_TARGET_LANGUAGE, normalize_language_code};
 
@@ -8,8 +11,8 @@ use crate::language::{DEFAULT_SOURCE_LANGUAGE, DEFAULT_TARGET_LANGUAGE, normaliz
     name = "tror",
     version,
     about = "Translate terminal text with Google Translate",
-    long_about = "Translate one or more text fragments from a source language to a target language.\n\nBy default, tror translates English text to Simplified Chinese. Pass multiple text fragments to preserve line breaks in the translated input.",
-    after_help = "Examples:\n  tror \"Hello, world\" \"this is Rust code language.\"\n  tror -i cn -o en \"你好，世界；这是 Rust 编程语言\"\n  tror -i auto -o ja \"Good morning\"\n  tror -p http://127.0.0.1:7890 \"Hello, world\"",
+    long_about = "Translate one or more text fragments from a source language to a target language.\n\nBy default, tror translates English text to Simplified Chinese. Pass multiple text fragments to preserve line breaks in the translated input, or pipe text in via stdin when no fragments are given.",
+    after_help = "Examples:\n  tror \"Hello, world\" \"this is Rust code language.\"\n  tror -i cn -o en \"你好，世界；这是 Rust 编程语言\"\n  tror -i auto -o ja \"Good morning\"\n  tror -p http://127.0.0.1:7890 \"Hello, world\"\n  echo \"Hello, world\" | tror\n  tror --completions zsh > _tror",
     styles = clap_cargo::style::CLAP_STYLING
 )]
 pub struct Cli {
@@ -42,11 +45,19 @@ pub struct Cli {
     )]
     pub proxy: Option<String>,
 
+    /// Generate a shell completion script and exit.
+    #[arg(
+        long = "completions",
+        value_name = "SHELL",
+        value_enum,
+        help = "Generate a shell completion script for SHELL (bash, zsh, fish, powershell, elvish) and exit"
+    )]
+    pub completions: Option<Shell>,
+
     /// Text fragments to translate. Multiple fragments are joined with newlines.
     #[arg(
-        required = true,
         value_name = "TEXT",
-        help = "Text fragments to translate; multiple fragments are joined with newlines"
+        help = "Text fragments to translate; multiple fragments are joined with newlines. If omitted, text is read from stdin."
     )]
     pub text: Vec<String>,
 }
@@ -76,11 +87,26 @@ pub fn parse_cli() -> Cli {
     Cli::parse()
 }
 
+/// Read all bytes from `reader` as UTF-8 text, trimming the trailing newline
+/// that shells typically append when piping input.
+pub fn read_text_from_reader<R: Read>(mut reader: R) -> io::Result<String> {
+    let mut buf = String::new();
+    reader.read_to_string(&mut buf)?;
+    if buf.ends_with('\n') {
+        buf.pop();
+        if buf.ends_with('\r') {
+            buf.pop();
+        }
+    }
+    Ok(buf)
+}
+
 #[cfg(test)]
 mod tests {
     use clap::{CommandFactory, Parser};
+    use clap_complete::Shell;
 
-    use super::Cli;
+    use super::{Cli, read_text_from_reader};
     use crate::language::{DEFAULT_SOURCE_LANGUAGE, DEFAULT_TARGET_LANGUAGE};
 
     #[test]
@@ -91,6 +117,7 @@ mod tests {
         assert_eq!(cli.output_language, DEFAULT_TARGET_LANGUAGE);
         assert_eq!(cli.proxy_url(), None);
         assert_eq!(cli.input_text(), "Hello, world");
+        assert!(cli.completions.is_none());
     }
 
     #[test]
@@ -125,6 +152,22 @@ mod tests {
     }
 
     #[test]
+    fn allows_omitting_text_when_completions_requested() {
+        let cli = Cli::parse_from(["tror", "--completions", "zsh"]);
+
+        assert_eq!(cli.completions, Some(Shell::Zsh));
+        assert!(cli.text.is_empty());
+    }
+
+    #[test]
+    fn allows_omitting_text_for_stdin_input() {
+        let cli = Cli::parse_from(["tror"]);
+
+        assert!(cli.text.is_empty());
+        assert_eq!(cli.input_text(), "");
+    }
+
+    #[test]
     fn help_includes_examples_and_language_guidance() {
         let mut command = Cli::command();
         let help = command.render_long_help().to_string();
@@ -135,6 +178,8 @@ mod tests {
         assert!(help.contains("Source language code"));
         assert!(help.contains("Target language code"));
         assert!(help.contains("HTTP proxy URL"));
+        assert!(help.contains("stdin"));
+        assert!(help.contains("completion"));
     }
 
     #[test]
@@ -145,5 +190,29 @@ mod tests {
             format!("{:?}", command.get_styles()),
             format!("{:?}", clap_cargo::style::CLAP_STYLING)
         );
+    }
+
+    #[test]
+    fn reads_text_from_reader_and_trims_trailing_newline() {
+        let result = read_text_from_reader(&b"Hello, world\n"[..]).unwrap();
+        assert_eq!(result, "Hello, world");
+    }
+
+    #[test]
+    fn reads_text_from_reader_trims_crlf() {
+        let result = read_text_from_reader(&b"Hello, world\r\n"[..]).unwrap();
+        assert_eq!(result, "Hello, world");
+    }
+
+    #[test]
+    fn reads_text_from_reader_preserves_interior_newlines() {
+        let result = read_text_from_reader(&b"line one\nline two\n"[..]).unwrap();
+        assert_eq!(result, "line one\nline two");
+    }
+
+    #[test]
+    fn reads_text_from_reader_returns_empty_on_empty_input() {
+        let result = read_text_from_reader(&b""[..]).unwrap();
+        assert_eq!(result, "");
     }
 }
